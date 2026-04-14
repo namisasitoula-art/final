@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>नया वर्ष २०८२ को शुभकामना!</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{overflow:hidden;width:100vw;height:100vh;background:#1a0a2e;font-family:Georgia,serif;}
+canvas{display:block;position:absolute;top:0;left:0;}
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+#title-block{position:absolute;top:18px;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;z-index:10;}
+#title-main{font-size:clamp(18px,3.5vw,38px);color:#ffe97a;text-shadow:0 0 18px #ff9900,0 0 36px #ff6600,0 2px 4px #000;font-family:'Palatino Linotype',Georgia,serif;line-height:1.2;}
+#title-sub{font-size:clamp(9px,1.5vw,15px);letter-spacing:0.25em;color:#f5c97a;text-shadow:0 0 8px #ff9900;margin-top:4px;font-family:Georgia,serif;}
+#score-badge{position:absolute;top:18px;right:18px;background:rgba(20,8,40,0.85);border:2px solid #ffe97a;border-radius:12px;padding:8px 18px;color:#ffe97a;font-size:clamp(13px,2vw,18px);font-family:Georgia,serif;z-index:20;pointer-events:none;}
+.hotspot{position:absolute;cursor:pointer;pointer-events:all;border-radius:8px;transition:background 0.2s;}
+.hotspot:hover{background:rgba(255,220,80,0.18);}
+.tooltip{position:absolute;background:rgba(20,8,40,0.93);color:#ffe97a;border:1.5px solid #ffe97a;border-radius:8px;padding:7px 13px;font-size:13px;font-family:Georgia,serif;pointer-events:none;z-index:30;max-width:200px;text-align:center;white-space:normal;display:none;line-height:1.4;}
+#modal-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:50;pointer-events:all;}
+#modal-overlay.active{display:flex;}
+#modal{background:linear-gradient(135deg,#2a0e4a 0%,#1a0830 100%);border:2.5px solid #ffe97a;border-radius:18px;padding:32px 36px;max-width:380px;width:88%;text-align:center;position:relative;box-shadow:0 0 40px rgba(255,180,0,0.25);}
+#modal-icon{font-size:42px;margin-bottom:8px;}
+#modal-name{font-size:15px;color:#f5c97a;font-family:Georgia,serif;margin-bottom:4px;}
+#modal-riddle{font-size:17px;color:#fff;font-family:Georgia,serif;margin:12px 0 18px;line-height:1.5;}
+#modal-input{width:100%;padding:9px 14px;border-radius:8px;border:1.5px solid #ffe97a;background:rgba(255,255,255,0.08);color:#fff;font-size:15px;font-family:Georgia,serif;outline:none;margin-bottom:10px;}
+#modal-input::placeholder{color:rgba(255,220,100,0.4);}
+#modal-feedback{font-size:14px;margin-bottom:8px;min-height:22px;font-family:Georgia,serif;font-style:italic;}
+.modal-btn{padding:9px 24px;border-radius:8px;border:1.5px solid #ffe97a;background:transparent;color:#ffe97a;font-size:14px;font-family:Georgia,serif;cursor:pointer;margin:4px;transition:background 0.15s;}
+.modal-btn:hover{background:rgba(255,220,80,0.18);}
+#modal-close{position:absolute;top:10px;right:14px;color:#f5c97a;font-size:22px;cursor:pointer;line-height:1;background:none;border:none;}
+.petal{position:absolute;pointer-events:none;z-index:5;border-radius:50% 40% 50% 40%;animation:fall linear infinite;}
+@keyframes fall{0%{transform:translateY(-30px) rotate(0deg);opacity:0.9;}100%{transform:translateY(105vh) rotate(720deg);opacity:0;}}
+.sparkle{position:absolute;font-size:22px;pointer-events:none;z-index:60;animation:sparkpop 1.2s ease-out forwards;}
+@keyframes sparkpop{0%{transform:scale(0.2) translateY(0);opacity:1;}60%{transform:scale(1.3) translateY(-40px);opacity:1;}100%{transform:scale(0.8) translateY(-80px);opacity:0;}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="title-block">
+    <div id="title-main">नया वर्ष २०८२ को शुभकामना!</div>
+    <div id="title-sub">NAVA VARSHA KO SHUBHAKAMANA</div>
+  </div>
+  <div id="score-badge">⭐ Score: <span id="score-val">0</span></div>
+  <div class="tooltip" id="tooltip"></div>
+  <div id="modal-overlay">
+    <div id="modal">
+      <button id="modal-close">✕</button>
+      <div id="modal-icon"></div>
+      <div id="modal-name"></div>
+      <div id="modal-riddle"></div>
+      <input id="modal-input" type="text" placeholder="Type your answer…">
+      <div id="modal-feedback"></div>
+      <div>
+        <button class="modal-btn" id="btn-submit">Submit</button>
+        <button class="modal-btn" id="btn-skip">Skip</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W,H,hotspots=[];
+
+function shadeHex(hex,amt){
+  let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  r=Math.min(255,Math.max(0,r+amt));g=Math.min(255,Math.max(0,g+amt));b=Math.min(255,Math.max(0,b+amt));
+  return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+function resize(){
+  W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;
+  draw();repositionHotspots();
+}
+
+function draw(){
+  drawSky();drawSun();drawStars();drawClouds();drawMountains();drawHaze();
+  drawMidgroundTrees();drawTerraces();drawHuts();drawPeople();drawForeground();
+}
+
+function drawSky(){
+  const grad=ctx.createLinearGradient(0,0,0,H*0.55);
+  grad.addColorStop(0,'#0d0628');grad.addColorStop(0.25,'#1a1060');
+  grad.addColorStop(0.55,'#3d1f6e');grad.addColorStop(0.75,'#c45c20');
+  grad.addColorStop(0.88,'#e8921a');grad.addColorStop(1,'#f5c96a');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,W,H*0.55);
+}
+
+function drawSun(){
+  const sx=W*0.62,sy=H*0.18,sr=H*0.065;
+  const halo=ctx.createRadialGradient(sx,sy,sr*0.3,sx,sy,sr*3.5);
+  halo.addColorStop(0,'rgba(255,240,120,0.85)');halo.addColorStop(0.25,'rgba(255,170,50,0.5)');
+  halo.addColorStop(0.6,'rgba(255,100,20,0.18)');halo.addColorStop(1,'rgba(255,80,0,0)');
+  ctx.fillStyle=halo;ctx.beginPath();ctx.arc(sx,sy,sr*3.5,0,Math.PI*2);ctx.fill();
+  const sun=ctx.createRadialGradient(sx-sr*0.15,sy-sr*0.15,0,sx,sy,sr);
+  sun.addColorStop(0,'#fffde0');sun.addColorStop(0.5,'#ffe060');sun.addColorStop(1,'#ff9a10');
+  ctx.fillStyle=sun;ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);ctx.fill();
+}
+
+function drawStars(){
+  const stars=[[0.08,0.05],[0.18,0.03],[0.28,0.07],[0.12,0.12],[0.35,0.04],[0.42,0.09],[0.22,0.15],[0.05,0.15],[0.48,0.06]];
+  stars.forEach(([fx,fy])=>{
+    const x=W*fx,y=H*fy,r=1.2+Math.random()*1.2;
+    ctx.fillStyle='rgba(255,255,220,0.85)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  });
+}
+
+function drawClouds(){
+  const clouds=[[0.15,0.12,0.09],[0.38,0.08,0.06],[0.7,0.14,0.08],[0.55,0.22,0.07],[0.08,0.22,0.05]];
+  clouds.forEach(([fx,fy,fs])=>{
+    const cx=W*fx,cy=H*fy,s=W*fs;
+    ctx.fillStyle='rgba(255,255,255,0.22)';
+    [[0,0,s],[s*0.6,-s*0.2,s*0.75],[s*1.2,0,s*0.65],[s*0.3,s*0.1,s*0.8]].forEach(([dx,dy,r])=>{
+      ctx.beginPath();ctx.ellipse(cx+dx,cy+dy,r,r*0.45,0,0,Math.PI*2);ctx.fill();
+    });
+    ctx.fillStyle='rgba(255,255,255,0.12)';
+    [[s*0.1,s*0.12,s*0.55]].forEach(([dx,dy,r])=>{
+      ctx.beginPath();ctx.ellipse(cx+dx,cy+dy,r,r*0.35,0,0,Math.PI*2);ctx.fill();
+    });
+  });
+}
+
+function drawMountains(){
+  const layers=[
+    {peaks:[[0,0.72],[0.08,0.38],[0.18,0.52],[0.28,0.32],[0.4,0.45],[0.52,0.3],[0.62,0.43],[0.72,0.35],[0.82,0.48],[0.92,0.36],[1,0.55],[1,0.72]],fill:'#1a1845',snow:'#b0b8d8',snowH:0.07},
+    {peaks:[[0,0.72],[0.05,0.44],[0.15,0.55],[0.25,0.37],[0.38,0.5],[0.5,0.33],[0.6,0.46],[0.7,0.38],[0.8,0.5],[0.88,0.4],[0.96,0.53],[1,0.72]],fill:'#243460',snow:'#c8d4ee',snowH:0.06},
+    {peaks:[[0,0.72],[0.04,0.5],[0.14,0.58],[0.24,0.42],[0.36,0.54],[0.48,0.38],[0.58,0.5],[0.68,0.42],[0.78,0.52],[0.86,0.44],[0.95,0.56],[1,0.72]],fill:'#2e4a80',snow:'#dde7f5',snowH:0.055},
+    {peaks:[[0,0.75],[0.06,0.54],[0.18,0.62],[0.3,0.48],[0.42,0.58],[0.54,0.44],[0.64,0.55],[0.74,0.47],[0.84,0.57],[0.92,0.5],[1,0.75]],fill:'#3a6099',snow:'#eef4ff',snowH:0.05},
+    {peaks:[[0,0.78],[0.1,0.59],[0.22,0.67],[0.34,0.55],[0.46,0.64],[0.56,0.52],[0.66,0.62],[0.76,0.55],[0.86,0.63],[0.94,0.57],[1,0.78]],fill:'#6095b8',snow:'#f5faff',snowH:0.04},
+  ];
+  layers.forEach(({peaks,fill,snow,snowH})=>{
+    ctx.fillStyle=fill;ctx.beginPath();
+    peaks.forEach(([fx,fy],i)=>i===0?ctx.moveTo(W*fx,H*fy):ctx.lineTo(W*fx,H*fy));
+    ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+    for(let i=1;i<peaks.length-1;i++){
+      const [px,py]=peaks[i];const mx=W*px,my=H*py;
+      const lx=i>1?W*peaks[i-1][0]:mx-W*0.06,rx=i<peaks.length-2?W*peaks[i+1][0]:mx+W*0.06;
+      const sw=(rx-lx)*0.32,sh=H*snowH;
+      ctx.fillStyle=snow;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx-sw,my+sh*1.1);ctx.lineTo(mx+sw,my+sh*1.1);ctx.closePath();ctx.fill();
+    }
+  });
+}
+
+function drawHaze(){
+  const grad=ctx.createLinearGradient(0,H*0.38,0,H*0.58);
+  grad.addColorStop(0,'rgba(120,160,220,0)');grad.addColorStop(0.5,'rgba(160,200,240,0.28)');grad.addColorStop(1,'rgba(200,220,240,0)');
+  ctx.fillStyle=grad;ctx.fillRect(0,H*0.38,W,H*0.2);
+}
+
+function drawMidgroundTrees(){
+  const treeY=H*0.6;
+  for(let x=0;x<W;x+=W*0.02){
+    const h=H*0.09+Math.random()*H*0.05;
+    const tw=h*0.38;
+    ctx.fillStyle=`hsl(${120+Math.random()*20},${55+Math.random()*20}%,${18+Math.random()*12}%)`;
+    ctx.beginPath();ctx.moveTo(x,treeY);
+    ctx.quadraticCurveTo(x-tw*0.5,treeY-h*0.5,x,treeY-h);
+    ctx.quadraticCurveTo(x+tw*0.5,treeY-h*0.5,x,treeY);ctx.fill();
+    ctx.beginPath();ctx.moveTo(x,treeY-h*0.3);
+    ctx.quadraticCurveTo(x-tw*0.6,treeY-h*0.65,x,treeY-h*1.1);
+    ctx.quadraticCurveTo(x+tw*0.6,treeY-h*0.65,x,treeY-h*0.3);ctx.fill();
+  }
+}
+
+function drawTerraces(){
+  const bands=[
+    {y:0.58,h:0.028,colors:['#2d6a1e','#357524','#26591a']},
+    {y:0.605,h:0.028,colors:['#3a7a22','#408526','#2e6619']},
+    {y:0.63,h:0.028,colors:['#4a8c28','#52962e','#3c7520']},
+    {y:0.655,h:0.03,colors:['#559530','#5fa036','#447a25']},
+    {y:0.682,h:0.035,colors:['#62a836','#6db33c','#508a28']},
+  ];
+  bands.forEach(({y,h,colors},bi)=>{
+    const pts=[];const steps=8;
+    for(let i=0;i<=steps;i++){
+      pts.push([i/steps,y+Math.sin(i/steps*Math.PI)*0.008*(bi%2===0?1:-1)]);
+    }
+    const grad=ctx.createLinearGradient(0,H*y,0,H*(y+h));
+    grad.addColorStop(0,colors[0]);grad.addColorStop(0.5,colors[1]);grad.addColorStop(1,colors[2]);
+    ctx.fillStyle=grad;ctx.beginPath();ctx.moveTo(0,H*(y+h));
+    pts.forEach(([fx,fy])=>ctx.lineTo(W*fx,H*fy));
+    ctx.lineTo(W,H*(y+h));ctx.closePath();ctx.fill();
+    ctx.strokeStyle=shadeHex(colors[2],-20);ctx.lineWidth=1;ctx.beginPath();
+    pts.forEach(([fx,fy],i)=>i===0?ctx.moveTo(W*fx,H*fy):ctx.lineTo(W*fx,H*fy));
+    ctx.stroke();
+  });
+}
+
+function drawHuts(){
+  const huts=[
+    {x:0.1,y:0.72,w:0.11,h:0.14,roof:'#8b2020',rtype:'tile',id:'hut1'},
+    {x:0.44,y:0.7,w:0.13,h:0.15,roof:'#5c3a1a',rtype:'thatch',id:'hut2'},
+    {x:0.76,y:0.72,w:0.1,h:0.13,roof:'#2a5c20',rtype:'green',id:'hut3'},
+  ];
+  huts.forEach(hut=>drawHut(hut));
+}
+
+function drawHut({x,y,w,h,roof,rtype}){
+  const hx=W*x,hy=H*y,hw=W*w,hh=H*h;
+  const wallGrad=ctx.createLinearGradient(hx,hy,hx+hw,hy);
+  wallGrad.addColorStop(0,'#6b5c42');wallGrad.addColorStop(0.4,'#8a7255');wallGrad.addColorStop(0.7,'#7a6548');wallGrad.addColorStop(1,'#5c4e38');
+  ctx.fillStyle=wallGrad;ctx.fillRect(hx,hy,hw,hh);
+  for(let si=1;si<5;si++){
+    ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=0.7;ctx.beginPath();
+    ctx.moveTo(hx,hy+hh*si/5);ctx.lineTo(hx+hw,hy+hh*si/5);ctx.stroke();
+  }
+  ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=0.5;
+  for(let xi=1;xi<6;xi++){ctx.beginPath();ctx.moveTo(hx+hw*xi/6,hy);ctx.lineTo(hx+hw*xi/6,hy+hh);ctx.stroke();}
+  const ry=hy-hh*0.38,rx=hx-hw*0.08,rw=hw*1.16,rh=hh*0.42;
+  ctx.fillStyle=roof;ctx.beginPath();ctx.moveTo(rx,hy);ctx.lineTo(hx+hw/2,ry);ctx.lineTo(rx+rw,hy);ctx.closePath();ctx.fill();
+  ctx.strokeStyle=shadeHex(roof,-30);ctx.lineWidth=0.8;
+  for(let ri=1;ri<8;ri++){
+    const t=ri/8;const lx1=rx+(hx+hw/2-rx)*t,ly1=hy-(hy-ry)*t;const rx1=rx+rw-(rx+rw-(hx+hw/2))*t;
+    ctx.beginPath();ctx.moveTo(lx1,ly1);ctx.lineTo(rx1,ly1);ctx.stroke();
+  }
+  const dw=hw*0.22,dh=hh*0.42,dx=hx+hw*0.39,dy=hy+hh*0.58;
+  ctx.fillStyle='#3a2510';ctx.fillRect(dx,dy,dw,dh);
+  ctx.strokeStyle='#5a3a18';ctx.lineWidth=1.5;ctx.strokeRect(dx,dy,dw,dh);
+  ctx.strokeStyle='#6b4820';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(dx+dw/2,dy);ctx.lineTo(dx+dw/2,dy+dh);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(dx,dy+dh*0.5);ctx.lineTo(dx+dw,dy+dh*0.5);ctx.stroke();
+  [[0.12,0.28],[0.66,0.28]].forEach(([wx,wy])=>{
+    const winx=hx+hw*wx,winy=hy+hh*wy,winw=hw*0.18,winh=hh*0.2;
+    ctx.fillStyle='rgba(140,190,230,0.35)';ctx.fillRect(winx,winy,winw,winh);
+    ctx.strokeStyle='#5a3a18';ctx.lineWidth=1;ctx.strokeRect(winx,winy,winw,winh);
+    ctx.strokeStyle='#5a3a18';ctx.lineWidth=0.7;
+    ctx.beginPath();ctx.moveTo(winx+winw/2,winy);ctx.lineTo(winx+winw/2,winy+winh);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(winx,winy+winh/2);ctx.lineTo(winx+winw,winy+winh/2);ctx.stroke();
+  });
+  const garlandY=hy-2;const garlandColors=['#ff4444','#ff9900','#ffdd00','#44bb44','#ff66aa','#cc44ff'];
+  ctx.strokeStyle='rgba(180,160,100,0.7)';ctx.lineWidth=1.2;ctx.beginPath();
+  ctx.moveTo(hx,garlandY);ctx.quadraticCurveTo(hx+hw/2,garlandY+H*0.015,hx+hw,garlandY);ctx.stroke();
+  for(let gi=0;gi<=8;gi++){
+    const t=gi/8;const gx=hx+(hx+hw-hx)*t;
+    const gy=garlandY+4*Math.sin(t*Math.PI)*H*0.015/H*H;
+    const gc=garlandColors[gi%garlandColors.length];
+    ctx.fillStyle=gc;ctx.beginPath();ctx.arc(gx,gy,3,0,Math.PI*2);ctx.fill();
+  }
+  const chimX=hx+hw*0.75,chimY=ry+H*0.03,chimW=hw*0.08,chimH=H*0.05;
+  ctx.fillStyle='#6b5c42';ctx.fillRect(chimX,chimY,chimW,chimH);
+  ctx.fillStyle='rgba(180,180,180,0.25)';ctx.beginPath();ctx.ellipse(chimX+chimW/2,chimY-chimH*0.2,chimW*1.2,chimH*0.4,0,0,Math.PI*2);ctx.fill();
+}
+
+function drawPeople(){
+  const people=[
+    {x:0.03,y:0.74,scale:0.95,id:'p1',drawFn:drawElderlyWoman},
+    {x:0.27,y:0.72,scale:1.0,id:'p2',drawFn:drawYoungMan},
+    {x:0.58,y:0.73,scale:0.92,id:'p3',drawFn:drawOldMan},
+    {x:0.87,y:0.72,scale:0.97,id:'p4',drawFn:drawYoungWoman},
+  ];
+  people.forEach(p=>p.drawFn(W*p.x,H*p.y,p.scale));
+}
+
+function drawElderlyWoman(bx,by,sc){
+  const s=H*0.16*sc;
+  ctx.fillStyle='#8b5e3c';ctx.beginPath();ctx.arc(bx,by-s*0.85,s*0.13,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#2a1a0a';ctx.beginPath();ctx.arc(bx,by-s*0.85,s*0.13,Math.PI,0);ctx.fill();
+  ctx.beginPath();ctx.arc(bx+s*0.08,by-s*0.85-s*0.04,s*0.055,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#ff88aa';ctx.beginPath();ctx.arc(bx+s*0.1,by-s*0.93,s*0.03,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#c2603a';ctx.beginPath();ctx.ellipse(bx,by-s*0.72,s*0.07,s*0.04,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#9b2277';
+  ctx.beginPath();ctx.moveTo(bx-s*0.22,by-s*0.6);ctx.lineTo(bx+s*0.22,by-s*0.6);ctx.lineTo(bx+s*0.28,by);ctx.lineTo(bx-s*0.28,by);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#c040a0';ctx.lineWidth=2;
+  for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(bx+i*s*0.08,by-s*0.6);ctx.lineTo(bx+i*s*0.1,by);ctx.stroke();}
+  ctx.strokeStyle='#ffd700';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(bx-s*0.22,by-s*0.08);ctx.lineTo(bx+s*0.22,by-s*0.08);ctx.stroke();
+  ctx.fillStyle='#8b5e3c';
+  ctx.beginPath();ctx.moveTo(bx-s*0.22,by-s*0.58);ctx.lineTo(bx-s*0.36,by-s*0.42);ctx.lineTo(bx-s*0.3,by-s*0.38);ctx.lineTo(bx-s*0.16,by-s*0.54);ctx.fill();
+  ctx.beginPath();ctx.moveTo(bx+s*0.22,by-s*0.58);ctx.lineTo(bx+s*0.36,by-s*0.42);ctx.lineTo(bx+s*0.3,by-s*0.38);ctx.lineTo(bx+s*0.16,by-s*0.54);ctx.fill();
+  ctx.fillStyle='#8b5e3c';
+  ctx.beginPath();ctx.moveTo(bx-s*0.1,by-s*0.4);ctx.lineTo(bx-s*0.02,by-s*0.3);ctx.lineTo(bx+s*0.02,by-s*0.3);ctx.lineTo(bx+s*0.1,by-s*0.4);ctx.fill();
+  const gc=['#ff9900','#ff4400','#ffdd00'];
+  for(let gi=0;gi<8;gi++){
+    const a=gi/7*Math.PI;const gx=bx+(s*0.18)*Math.cos(a)*0.7,gy=by-s*0.66+(s*0.08)*Math.sin(a);
+    ctx.fillStyle=gc[gi%3];ctx.beginPath();ctx.arc(gx,gy,s*0.018,0,Math.PI*2);ctx.fill();
+  }
+  ctx.strokeStyle='rgba(255,200,50,0.5)';ctx.lineWidth=1;ctx.beginPath();
+  ctx.arc(bx,by-s*0.66,s*0.18,Math.PI,0);ctx.stroke();
+}
+
+function drawYoungMan(bx,by,sc){
+  const s=H*0.17*sc;
+  ctx.fillStyle='#7a4a28';ctx.beginPath();ctx.arc(bx,by-s*0.87,s*0.12,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#2255aa';ctx.beginPath();ctx.ellipse(bx,by-s*0.93,s*0.14,s*0.07,-0.1,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#1a3d88';ctx.lineWidth=1;
+  for(let si=0;si<5;si++){const px=bx-s*0.1+si*s*0.05;ctx.beginPath();ctx.moveTo(px,by-s*0.93);ctx.lineTo(px,by-s*0.87);ctx.stroke();}
+  ctx.fillStyle='#7a4a28';ctx.beginPath();ctx.ellipse(bx,by-s*0.76,s*0.07,s*0.04,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#e8b820';
+  ctx.beginPath();ctx.moveTo(bx-s*0.18,by-s*0.65);ctx.lineTo(bx+s*0.18,by-s*0.65);ctx.lineTo(bx+s*0.2,by-s*0.1);ctx.lineTo(bx-s*0.2,by-s*0.1);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#c89a10';ctx.lineWidth=1.5;
+  for(let vi=0;vi<=3;vi++){ctx.beginPath();ctx.moveTo(bx-s*0.18+vi*s*0.12,by-s*0.65);ctx.lineTo(bx-s*0.18+vi*s*0.12,by-s*0.1);ctx.stroke();}
+  ctx.fillStyle='#f0f0f0';
+  ctx.beginPath();ctx.moveTo(bx-s*0.2,by-s*0.1);ctx.lineTo(bx+s*0.2,by-s*0.1);ctx.lineTo(bx+s*0.24,by+s*0.1);ctx.lineTo(bx-s*0.24,by+s*0.1);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#7a4a28';
+  ctx.beginPath();ctx.moveTo(bx-s*0.18,by-s*0.63);ctx.lineTo(bx-s*0.38,by-s*0.22);ctx.lineTo(bx-s*0.26,by-s*0.16);ctx.lineTo(bx-s*0.1,by-s*0.55);ctx.fill();
+  ctx.beginPath();ctx.moveTo(bx+s*0.18,by-s*0.63);ctx.lineTo(bx+s*0.42,by-s*0.16);ctx.lineTo(bx+s*0.3,by-s*0.08);ctx.lineTo(bx+s*0.1,by-s*0.55);ctx.fill();
+  const gc=['#ff6600','#ff3300','#ffbb00'];
+  for(let gi=0;gi<9;gi++){
+    const a=gi/8*Math.PI;const gx=bx+(s*0.2)*Math.cos(a)*0.7,gy=by-s*0.7+(s*0.08)*Math.sin(a);
+    ctx.fillStyle=gc[gi%3];ctx.beginPath();ctx.arc(gx,gy,s*0.018,0,Math.PI*2);ctx.fill();
+  }
+  ctx.strokeStyle='rgba(255,180,30,0.5)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(bx,by-s*0.7,s*0.2,Math.PI,0);ctx.stroke();
+}
+
+function drawOldMan(bx,by,sc){
+  const s=H*0.155*sc;
+  ctx.fillStyle='#7a5038';ctx.beginPath();ctx.arc(bx,by-s*0.86,s*0.12,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#e8e8e0';
+  ctx.beginPath();ctx.arc(bx,by-s*0.86,s*0.13,Math.PI,0);ctx.fill();
+  ctx.beginPath();ctx.ellipse(bx-s*0.06,by-s*0.76,s*0.04,s*0.025,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#7a5038';ctx.beginPath();ctx.ellipse(bx,by-s*0.74,s*0.065,s*0.035,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#e8e0d0';
+  ctx.beginPath();ctx.moveTo(bx-s*0.16,by-s*0.62);ctx.lineTo(bx+s*0.16,by-s*0.62);ctx.lineTo(bx+s*0.22,by+s*0.1);ctx.lineTo(bx-s*0.22,by+s*0.1);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#6b4020';
+  ctx.beginPath();ctx.moveTo(bx-s*0.1,by-s*0.65);ctx.lineTo(bx+s*0.1,by-s*0.65);ctx.lineTo(bx+s*0.12,by-s*0.25);ctx.lineTo(bx-s*0.12,by-s*0.25);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#7a5038';
+  ctx.beginPath();ctx.moveTo(bx-s*0.16,by-s*0.6);ctx.lineTo(bx-s*0.32,by-s*0.2);ctx.lineTo(bx-s*0.22,by-s*0.15);ctx.lineTo(bx-s*0.08,by-s*0.55);ctx.fill();
+  ctx.beginPath();ctx.moveTo(bx+s*0.16,by-s*0.6);ctx.lineTo(bx+s*0.28,by-s*0.15);ctx.lineTo(bx+s*0.36,by-s*0.12);ctx.lineTo(bx+s*0.25,by+s*0.02);ctx.lineTo(bx+s*0.1,by-s*0.55);ctx.fill();
+  ctx.strokeStyle='#7a5038';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(bx+s*0.36,by-s*0.12);ctx.lineTo(bx+s*0.38,by+s*0.1);ctx.stroke();
+  const gc=['#ffdd00','#ff6600'];
+  for(let gi=0;gi<7;gi++){
+    const a=gi/6*Math.PI;const gx=bx+(s*0.18)*Math.cos(a)*0.7,gy=by-s*0.66+(s*0.07)*Math.sin(a);
+    ctx.fillStyle=gc[gi%2];ctx.beginPath();ctx.arc(gx,gy,s*0.018,0,Math.PI*2);ctx.fill();
+  }
+  ctx.strokeStyle='rgba(255,180,30,0.5)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(bx,by-s*0.66,s*0.18,Math.PI,0);ctx.stroke();
+}
+
+function drawYoungWoman(bx,by,sc){
+  const s=H*0.17*sc;
+  ctx.fillStyle='#7a4a28';ctx.beginPath();ctx.arc(bx,by-s*0.87,s*0.12,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#100808';
+  ctx.beginPath();ctx.ellipse(bx,by-s*0.87,s*0.14,s*0.13,0.1,0,Math.PI);ctx.fill();
+  ctx.beginPath();ctx.moveTo(bx+s*0.1,by-s*0.87);ctx.quadraticCurveTo(bx+s*0.3,by-s*0.6,bx+s*0.18,by-s*0.4);ctx.quadraticCurveTo(bx+s*0.08,by-s*0.35,bx+s*0.05,by-s*0.55);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#ff88aa';ctx.beginPath();ctx.arc(bx+s*0.08,by-s*0.96,s*0.03,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#7a4a28';ctx.beginPath();ctx.ellipse(bx,by-s*0.75,s*0.065,s*0.035,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#7c3db0';
+  ctx.beginPath();ctx.moveTo(bx-s*0.16,by-s*0.64);ctx.lineTo(bx+s*0.16,by-s*0.64);ctx.lineTo(bx+s*0.12,by-s*0.22);ctx.lineTo(bx-s*0.12,by-s*0.22);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#b06ee0';
+  ctx.beginPath();ctx.moveTo(bx-s*0.22,by-s*0.22);ctx.quadraticCurveTo(bx,by-s*0.1,bx+s*0.22,by-s*0.22);ctx.lineTo(bx+s*0.3,by+s*0.1);ctx.lineTo(bx-s*0.3,by+s*0.1);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(200,160,240,0.3)';
+  ctx.beginPath();ctx.moveTo(bx-s*0.22,by-s*0.22);ctx.quadraticCurveTo(bx,by+s*0.0,bx+s*0.22,by-s*0.22);ctx.lineTo(bx+s*0.32,by+s*0.12);ctx.lineTo(bx-s*0.32,by+s*0.12);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#7a4a28';
+  ctx.beginPath();ctx.moveTo(bx-s*0.16,by-s*0.62);ctx.lineTo(bx-s*0.22,by-s*0.32);ctx.lineTo(bx-s*0.3,by-s*0.28);ctx.lineTo(bx-s*0.36,by-s*0.18);ctx.lineTo(bx-s*0.28,by-s*0.13);ctx.lineTo(bx-s*0.12,by-s*0.55);ctx.fill();
+  ctx.beginPath();ctx.moveTo(bx+s*0.16,by-s*0.62);ctx.lineTo(bx+s*0.22,by-s*0.32);ctx.lineTo(bx+s*0.28,by-s*0.28);ctx.lineTo(bx+s*0.22,by-s*0.25);ctx.lineTo(bx+s*0.1,by-s*0.55);ctx.fill();
+  ctx.fillStyle='#5c3a10';ctx.beginPath();ctx.ellipse(bx+s*0.25,by-s*0.28,s*0.1,s*0.07,-0.5,0,Math.PI*2);ctx.fill();
+  const fc=['#ff4488','#ff9900','#44cc44','#ff4444','#ffdd00','#cc44ff'];
+  for(let fi=0;fi<8;fi++){
+    const a=fi/7*Math.PI*2;const fx=bx+s*0.25+s*0.075*Math.cos(a),fy=by-s*0.28+s*0.05*Math.sin(a);
+    ctx.fillStyle=fc[fi%6];ctx.beginPath();ctx.arc(fx,fy,s*0.02,0,Math.PI*2);ctx.fill();
+  }
+  const gc=['#ff9900','#ff4400','#ffdd00','#ff88aa'];
+  for(let gi=0;gi<8;gi++){
+    const a=gi/7*Math.PI;const gx=bx+(s*0.19)*Math.cos(a)*0.7,gy=by-s*0.69+(s*0.08)*Math.sin(a);
+    ctx.fillStyle=gc[gi%4];ctx.beginPath();ctx.arc(gx,gy,s*0.018,0,Math.PI*2);ctx.fill();
+  }
+  ctx.strokeStyle='rgba(255,150,50,0.5)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(bx,by-s*0.69,s*0.19,Math.PI,0);ctx.stroke();
+}
+
+function drawForeground(){
+  const fgGrad=ctx.createLinearGradient(0,H*0.83,0,H);
+  fgGrad.addColorStop(0,'#3d8a1a');fgGrad.addColorStop(0.4,'#4a9c20');fgGrad.addColorStop(1,'#2d6e12');
+  ctx.fillStyle=fgGrad;ctx.fillRect(0,H*0.83,W,H*0.17);
+  for(let gx=0;gx<W;gx+=W*0.008){
+    const bh=H*0.04+Math.random()*H*0.05;
+    const gf=H*0.84+Math.random()*H*0.03;
+    ctx.strokeStyle=`hsl(${105+Math.random()*30},${60+Math.random()*25}%,${28+Math.random()*20}%)`;
+    ctx.lineWidth=1+Math.random();ctx.beginPath();
+    ctx.moveTo(gx,gf);ctx.quadraticCurveTo(gx+(Math.random()-0.5)*W*0.02,gf-bh*0.5,gx+(Math.random()-0.5)*W*0.025,gf-bh);
+    ctx.stroke();
+  }
+  const flowerColors=['#ff3333','#ffdd00','#ff8800','#ff66aa'];
+  for(let fi=0;fi<60;fi++){
+    const fx=Math.random()*W,fy=H*0.83+Math.random()*H*0.1;
+    ctx.fillStyle=flowerColors[Math.floor(Math.random()*flowerColors.length)];
+    ctx.beginPath();ctx.arc(fx,fy,2+Math.random()*2.5,0,Math.PI*2);ctx.fill();
+  }
+}
+
+const riddleData=[
+  {id:'p1',name:'Sita Didi 🙏',icon:'👵',riddle:'Namaste! I am making a special dish for New Year. What is "chiura" — the beloved Nepali beaten food?',key:'rice',hint:'Think of a grain... it\'s beaten/pounded!'},
+  {id:'p2',name:'Ramesh Dai 🎉',icon:'🕺',riddle:'Jaya Nepal! What is the national flower of Nepal, blooming red across the hills?',key:'rhododendron',hint:'Also called "lali gurans" in Nepali!'},
+  {id:'p3',name:'Kaji Hajur 🙏',icon:'👴',riddle:'Namaste, young one! What is the traditional woven cap worn by Nepali men called?',key:'dhaka topi',hint:'It has a distinctive woven pattern called Dhaka!'},
+  {id:'p4',name:'Sunita Bahini 🌸',icon:'💃',riddle:'Happy New Year! What do we call the flower necklace garland placed around the necks of honoured guests?',key:'mala',hint:'Also called garland — a flower necklace! (mala or garland)'},
+  {id:'hut1',name:'Ancient Stone Hut 🏠',icon:'🏡',riddle:'This hut has stood for many New Years! What traditional calendar system does Nepal follow, which is about 56-57 years ahead of the Gregorian calendar?',key:'bikram',hint:'It starts with "Bikram" — the Bikram Sambat!'},
+  {id:'hut2',name:'Thatch Roof Hut 🏘️',icon:'⛰️',riddle:'From this hut, we can see mighty peaks! What is the world\'s highest mountain, located in Nepal — known locally as Sagarmatha?',key:'everest',hint:'Sir Edmund Hillary climbed it in 1953!'},
+];
+
+let score=0;const solved=new Set();
+let currentRiddle=null;
+
+function setupHotspots(){
+  document.querySelectorAll('.hotspot').forEach(e=>e.remove());
+  const configs=[
+    {id:'p1',fx:0.03,fy:0.58,fw:0.08,fh:0.2,tip:'🙏 Sita Didi — Click to chat!'},
+    {id:'p2',fx:0.23,fy:0.55,fw:0.09,fh:0.22,tip:'🎉 Ramesh Dai — Click to celebrate!'},
+    {id:'p3',fx:0.54,fy:0.57,fw:0.08,fh:0.2,tip:'🙏 Kaji Hajur — Click for wisdom!'},
+    {id:'p4',fx:0.83,fy:0.55,fw:0.1,fh:0.22,tip:'🌸 Sunita Bahini — Click to greet!'},
+    {id:'hut1',fx:0.07,fy:0.6,fw:0.13,fh:0.18,tip:'🏡 Old Stone Hut — Click to explore!'},
+    {id:'hut2',fx:0.41,fy:0.57,fw:0.15,fh:0.2,tip:'🏘️ Thatch Hut — Click to knock!'},
+  ];
+  const tooltip=document.getElementById('tooltip');
+  configs.forEach(cfg=>{
+    const div=document.createElement('div');div.className='hotspot';div.dataset.id=cfg.id;
+    repositionHotspot(div,cfg);
+    div.addEventListener('mouseenter',e=>{
+      const r=div.getBoundingClientRect();
+      tooltip.style.left=(r.left+r.width/2)+'px';tooltip.style.top=(r.top-44)+'px';
+      tooltip.style.transform='translateX(-50%)';tooltip.style.display='block';
+      tooltip.textContent=solved.has(cfg.id)?'✅ Already solved! शाबास!':cfg.tip;
+    });
+    div.addEventListener('mouseleave',()=>{tooltip.style.display='none';});
+    div.addEventListener('click',()=>{tooltip.style.display='none';openModal(cfg.id);});
+    document.getElementById('ui').appendChild(div);
+    div._cfg=cfg;
+  });
+}
+
+function repositionHotspot(div,cfg){
+  div.style.left=(W*cfg.fx)+'px';div.style.top=(H*cfg.fy)+'px';
+  div.style.width=(W*cfg.fw)+'px';div.style.height=(H*cfg.fh)+'px';
+}
+
+function repositionHotspots(){
+  document.querySelectorAll('.hotspot').forEach(div=>{
+    if(div._cfg)repositionHotspot(div,div._cfg);
+  });
+}
+
+function openModal(id){
+  if(solved.has(id)){showFeedback('green','✅ Already solved! शाबास! Great memory!');return;}
+  const riddle=riddleData.find(r=>r.id===id);if(!riddle)return;
+  currentRiddle=riddle;
+  document.getElementById('modal-icon').textContent=riddle.icon;
+  document.getElementById('modal-name').textContent=riddle.name;
+  document.getElementById('modal-riddle').textContent=riddle.riddle;
+  document.getElementById('modal-input').value='';
+  document.getElementById('modal-feedback').textContent='';
+  document.getElementById('modal-feedback').style.color='';
+  document.getElementById('modal-overlay').classList.add('active');
+  setTimeout(()=>document.getElementById('modal-input').focus(),100);
+}
+
+function checkAnswer(){
+  if(!currentRiddle)return;
+  const ans=document.getElementById('modal-input').value.trim().toLowerCase();
+  const key=currentRiddle.key.toLowerCase();
+  const altKeys={'mala':['mala','garland'],'rhododendron':['rhododendron','lali gurans','gurans'],'bikram':['bikram','bikram sambat','sambat'],'everest':['everest','sagarmatha'],'dhaka topi':['dhaka topi','dhaka','topi'],'rice':['rice','beaten rice','pounded rice','chiura']};
+  const checks=altKeys[key]||[key];
+  const correct=checks.some(k=>ans.includes(k));
+  if(correct){
+    document.getElementById('modal-feedback').textContent='✅ Correct! +10 points! शाबास! 🎉';
+    document.getElementById('modal-feedback').style.color='#66ff88';
+    score+=10;document.getElementById('score-val').textContent=score;
+    solved.add(currentRiddle.id);
+    spawnSparkles();
+    setTimeout(closeModal,1500);
+  } else {
+    document.getElementById('modal-feedback').textContent='❌ Not quite! Hint: '+currentRiddle.hint;
+    document.getElementById('modal-feedback').style.color='#ff6666';
+  }
+}
+
+function closeModal(){
+  document.getElementById('modal-overlay').classList.remove('active');
+  currentRiddle=null;
+}
+
+function spawnSparkles(){
+  const emojis=['🌸','✨','🎉','🌺','⭐','🎊','💫','🌼'];
+  for(let i=0;i<6;i++){
+    const sp=document.createElement('div');sp.className='sparkle';
+    sp.textContent=emojis[Math.floor(Math.random()*emojis.length)];
+    sp.style.left=(20+Math.random()*60)+'vw';sp.style.top=(30+Math.random()*30)+'vh';
+    sp.style.animationDelay=(Math.random()*0.4)+'s';
+    document.body.appendChild(sp);setTimeout(()=>sp.remove(),1600);
+  }
+}
+
+function showFeedback(color,msg){
+  const fb=document.createElement('div');
+  fb.style.cssText=`position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(20,8,40,0.95);border:2px solid ${color==='green'?'#66ff88':'#ff6666'};color:${color==='green'?'#66ff88':'#ff6666'};padding:16px 28px;border-radius:12px;font-size:16px;z-index:100;font-family:Georgia,serif;text-align:center;`;
+  fb.textContent=msg;document.body.appendChild(fb);setTimeout(()=>fb.remove(),2000);
+}
+
+function createPetals(){
+  const colors=['#ff6699','#ff9944','#ffdd44','#ff4466','#cc44ff','#ff88cc','#ff5533','#44cc88'];
+  for(let i=0;i<20;i++){
+    const p=document.createElement('div');p.className='petal';
+    const c=colors[Math.floor(Math.random()*colors.length)];
+    const size=8+Math.random()*12;
+    p.style.cssText=`width:${size}px;height:${size*0.6}px;background:${c};left:${Math.random()*100}vw;top:-20px;opacity:${0.6+Math.random()*0.4};animation-duration:${4+Math.random()*6}s;animation-delay:${Math.random()*5}s;z-index:5;`;
+    document.getElementById('ui').appendChild(p);
+  }
+}
+
+document.getElementById('btn-submit').addEventListener('click',checkAnswer);
+document.getElementById('btn-skip').addEventListener('click',closeModal);
+document.getElementById('modal-close').addEventListener('click',closeModal);
+document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))closeModal();});
+document.getElementById('modal-input').addEventListener('keydown',e=>{if(e.key==='Enter')checkAnswer();});
+
+window.addEventListener('resize',resize);
+resize();
+setupHotspots();
+createPetals();
+</script>
+</body>
+</html>
